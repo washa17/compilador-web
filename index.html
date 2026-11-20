@@ -187,9 +187,13 @@ async function acompanhar(nome,commit,placa,t0){
  if(!run||run.status!=='completed')throw new Error('Tempo esgotado. Veja a aba Actions do repositório.');
  const lg=await api(`/contents/bin/${nome}.log.txt`,{headers:RAW});
  if(lg.ok){$('#log').textContent=(await lg.text()).slice(-6000);}
- const m=await api(`/contents/bin/${nome}.ino.bin`);
- if(run.conclusion!=='success'||!m.ok){LS('pend',null);$('#prog').hidden=true;$('#logBox').open=true;throw new Error('A compilação falhou. Veja o log abaixo.')}
- const size=(await m.json()).size;prog(100,3);LS('pend',null);
+ if(run.conclusion!=='success'){
+  let et='';try{const jr=await api(`/actions/runs/${run.id}/jobs`),jj=await jr.json(),st=(jj.jobs||[]).flatMap(j=>j.steps||[]).find(x=>x.conclusion==='failure');if(st)et=st.name}catch(e){}
+  LS('pend',null);$('#prog').hidden=true;$('#logBox').open=true;
+  throw new Error('A compilação falhou'+(et?' na etapa "'+et+'"':'')+'.\nVeja o log abaixo ou a execução: '+run.html_url)}
+ const lr=await api('/contents/bin'),lst=lr.ok?await lr.json():[],fi=Array.isArray(lst)&&lst.find(x=>x.name===nome+'.ino.bin');
+ if(!fi){LS('pend',null);$('#prog').hidden=true;throw new Error('A compilação terminou, mas o arquivo não foi encontrado na pasta bin/ do repositório.')}
+ const size=fi.size;prog(100,3);LS('pend',null);
  lastBin=nome;$('#rname').textContent=nome+'.ino.bin';$('#rmeta').textContent=mb(size)+', compilado em '+quando(Date.now())+' para '+bname(placa);$('#res').hidden=false;
  msg('Pronto! Baixando...');await baixar(nome);msg('Pronto!');
  dados.recentes=[{nome,t:Date.now(),placa,size},...dados.recentes.filter(x=>x.nome!==nome)].slice(0,10);
