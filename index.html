@@ -91,6 +91,9 @@ dialog::backdrop{background:rgba(5,7,15,.75)}dialog h2{margin-bottom:6px}
 .field select{width:100%;border-radius:14px;padding:12px;background:var(--bg);border:1.5px solid var(--line)}
 .btns{display:flex;gap:10px;margin-top:18px}.btns button{flex:1;border-radius:999px;padding:12px;font-weight:700;border:1px solid var(--line);background:transparent}
 .btns .p{background:var(--blue);border-color:var(--blue);color:#fff}
+.mini{margin-left:auto;flex:none;height:fit-content;border:1px solid var(--line);background:var(--card2);border-radius:999px;padding:4px 12px;font-weight:700;font-size:.8rem}
+.ckl .warn i{color:var(--star)}
+.stop{width:100%;margin:-4px 0 14px;color:var(--err);border-color:#4a2a35}
 </style></head><body><main>
 <div class="top"><div class="brand"><span class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg></span>Compilador</div>
 <select id="placa" aria-label="Placa"></select></div>
@@ -108,6 +111,7 @@ dialog::backdrop{background:rgba(5,7,15,.75)}dialog h2{margin-bottom:6px}
 <textarea id="code" spellcheck="false" autocapitalize="off" autocorrect="off" wrap="off" aria-label="Código"></textarea>
 </section>
 <button class="go" id="go" type="button" disabled>Compilar</button>
+<button class="ghost stop" id="stop" type="button" hidden>Parar compilação</button>
 <p id="msg"></p>
 <section id="prog" hidden><p class="num"><span id="pct">0</span><small>%</small></p><div class="bar"><i id="fill"></i></div>
 <div class="marks"><span id="m1">Enviado</span><span id="m2">Compilando</span><span id="m3">Pronto</span></div></section>
@@ -136,7 +140,7 @@ const $=s=>document.querySelector(s),sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const LS=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(k));v===null?localStorage.removeItem(k):localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}};
 const BOARDS=[["ESP32","esp32:esp32:esp32:PartitionScheme=default"],["ESP32-C3","esp32:esp32:esp32c3:CDCOnBoot=cdc,PartitionScheme=default"],["ESP32-S3","esp32:esp32:esp32s3:CDCOnBoot=cdc,PartitionScheme=default"],["ESP32-S2","esp32:esp32:esp32s2:PartitionScheme=default"],["ESP32-C6","esp32:esp32:esp32c6:CDCOnBoot=cdc,PartitionScheme=default"]];
 const bname=v=>(BOARDS.find(b=>b[1]===v)||[v])[0];
-let cfg=LS('cfg')||{},dados={salvos:[],recentes:[],placas:[]},cur=null,busy=false,lastBin=null;
+let cfg=LS('cfg')||{},dados={salvos:[],recentes:[],placas:[]},cur=null,busy=false,lastBin=null,parar=false,libsRepo=null;
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const slug=n=>n.replace(/\.ino$/i,'').replace(/[^A-Za-z0-9_-]/g,'_');
 const b64=t=>{let s='';new TextEncoder().encode(t).forEach(c=>s+=String.fromCharCode(c));return btoa(s)};
@@ -173,6 +177,8 @@ function abrir(nome,txt){cur={nome};$('#fname').textContent=nome+'.ino';$('#ed')
 
 const VER=/^(\s*#define\s+(?:FW_VERSION|FIRMWARE_VERSION|VERSION|VERSAO|FW_VER)\s+")([^"]*)(")/m;
 const DEV=/^(\s*#define\s+DEVICE_ID\s+)(\d+)/m;
+const LIBS={'Arduino_GFX_Library.h':'GFX Library for Arduino','PubSubClient.h':'PubSubClient','ArduinoJson.h':'ArduinoJson','Adafruit_GFX.h':'Adafruit GFX Library','Adafruit_SSD1306.h':'Adafruit SSD1306','Adafruit_Sensor.h':'Adafruit Unified Sensor','DHT.h':'DHT sensor library','FastLED.h':'FastLED','Adafruit_NeoPixel.h':'Adafruit NeoPixel','ESP32Servo.h':'ESP32Servo','Servo.h':'ESP32Servo','LiquidCrystal_I2C.h':'LiquidCrystal I2C','TFT_eSPI.h':'TFT_eSPI','U8g2lib.h':'U8g2','OneWire.h':'OneWire','DallasTemperature.h':'DallasTemperature','Adafruit_BME280.h':'Adafruit BME280 Library','NewPing.h':'NewPing','ElegantOTA.h':'ElegantOTA','WiFiManager.h':'WiFiManager','lvgl.h':'lvgl','XPT2046_Touchscreen.h':'XPT2046_Touchscreen','TJpg_Decoder.h':'TJpg_Decoder','ESPAsyncWebServer.h':'ESP Async WebServer','AsyncTCP.h':'Async TCP','Adafruit_ILI9341.h':'Adafruit ILI9341','Adafruit_ST7735.h':'Adafruit ST7735 and ST7789 Library','MFRC522.h':'MFRC522','IRremote.h':'IRremote','AccelStepper.h':'AccelStepper','Bounce2.h':'Bounce2','RTClib.h':'RTClib','HX711.h':'HX711','TinyGPS++.h':'TinyGPSPlus','WebSocketsServer.h':'WebSockets'};
+const CORE=/^(arduino|wifi\w*|webserver|espmdns|update|http\w*|spi|wire|fs|spiffs|littlefs|sd|sd_mmc|preferences|eeprom|arduinoota|dnsserver|ticker|bluetooth\w*|ble\w*|hardwareserial|usb\w*|network\w*|time|pins_arduino|print|stream|ipaddress|client|server|udp|wstring|hwcdc|esp_\w+|lwip\w*|mbedtls\w*|freertos\w*|driver|soc|hal|stdio|stdlib|string|math|stdint|stdbool|ctype|limits|inttypes)$/i;
 function analisar(t){
  const k=t.replace(/R"(\w*)\([\s\S]*?\)\1"|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,m=>m[0]==='/'?' ':m[0]==='R'?'""':m);
  const s=k.replace(/"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'/g,'""');
@@ -188,11 +194,24 @@ function analisar(t){
  it.push(T(/WiFi\s*\.\s*(begin|softAP)\s*\(/)?{c:'ok',t:'Conexão Wi-Fi encontrada'}:{c:'bad',t:'Sem WiFi.begin ou WiFi.softAP',d:'A placa não vai ficar acessível pela rede.'});
  it.push(T(/void\s+setup\s*\(/)&&T(/void\s+loop\s*\(/)?{c:'ok',t:'setup() e loop() presentes'}:{c:'bad',t:'Faltam setup() ou loop()'});
  it.push(bal?{c:'ok',t:'Chaves e parênteses balanceados'}:{c:'bad',t:'Chaves ou parênteses desbalanceados',d:'Provável erro de digitação.'});
- return{ota,loopOk,it};
+ const erro=/["']/.test(s.replace(/""/g,''));
+ if(erro)it.push({c:'bad',t:'Texto sem fechar aspas',d:'Provável quebra de linha dentro de uma string: use \\n em vez de pular a linha.'});
+ const faltam=[],locais=[],desc=[],achadas=[];
+ for(const m of k.matchAll(/^\s*#\s*include\s*([<"])([^>"]+)[>"]/gm)){
+  const h=m[2].trim(),b=h.split('/').pop(),lib=LIBS[b];
+  if(m[1]==='"'){locais.push(h);continue}
+  if(lib){achadas.push(lib);if(libsRepo&&!libsRepo.includes(lib.toLowerCase())&&!faltam.includes(lib))faltam.push(lib)}
+  else if(/\./.test(b)&&!/^(esp_|driver\/|freertos\/|soc\/|hal\/|lwip\/|mbedtls\/|sys\/)/i.test(h)&&!CORE.test(b.replace(/\.h(pp)?$/i,'')))desc.push(b);
+ }
+ faltam.forEach(l=>it.push({c:'bad',t:'Biblioteca ausente: '+l,d:'Não está em bibliotecas.txt.',lib:l}));
+ if(achadas.length&&libsRepo&&!faltam.length)it.push({c:'ok',t:'Bibliotecas conferidas ('+new Set(achadas).size+')'});
+ locais.forEach(h=>it.push({c:'bad',t:'Arquivo local não enviado: '+h,d:'Só o .ino é enviado. Cole o conteúdo dele no código.'}));
+ [...new Set(desc)].slice(0,4).forEach(h=>it.push({c:'warn',t:'Biblioteca não reconhecida: '+h,d:'Confirme que ela está em bibliotecas.txt.'}));
+ return{ota,loopOk,it,faltam,locais,erro};
 }
 function render(){
  const t=getCode(),a=analisar(t),b=$('#badge'),bom=a.ota&&a.loopOk;
- $('#ck').innerHTML=a.it.map(x=>`<li class="${x.c}"><i>${x.c==='ok'?'✓':'✕'}</i><span>${esc(x.t)}${x.d?`<small>${esc(x.d)}</small>`:''}</span></li>`).join('');
+ $('#ck').innerHTML=a.it.map(x=>`<li class="${x.c}"><i>${x.c==='ok'?'✓':x.c==='warn'?'!':'✕'}</i><span>${esc(x.t)}${x.d?`<small>${esc(x.d)}</small>`:''}</span>${x.lib?`<button class="mini" type="button" data-lib="${esc(x.lib)}">Adicionar</button>`:''}</li>`).join('');
  b.textContent=bom?'OTA ok':a.ota?'OTA incompleto':'Sem OTA';b.className='badge '+(bom?'ok':'bad');
  const v=t.match(VER),d=t.match(DEV);$('#fVer').hidden=!v;$('#fDev').hidden=!d;
  if(v&&document.activeElement!==$('#inVer'))$('#inVer').value=v[2];
@@ -204,15 +223,19 @@ $('#code').oninput=render;
 $('#inVer').oninput=e=>setVer(e.target.value);
 $('#inDev').oninput=e=>{setCode(getCode().replace(DEV,(m,a)=>a+(e.target.value.replace(/\D/g,'')||'0')));render()};
 $('#bump').onclick=()=>{const v=getCode().match(VER);if(!v)return;const n=/\d/.test(v[2])?v[2].replace(/(\d+)(?!.*\d)/,m=>+m+1):v[2]+' 2';$('#inVer').value=n;setVer(n)};
-$('#go').onclick=()=>{if(!cur)return;const t=getCode(),a=analisar(t),ruim=a.it.find(x=>x.c==='bad');
- if((!a.ota||!a.loopOk)&&!confirm((a.ota?'O OTA está incompleto: '+ruim.t+'.':'O código não tem interface OTA.')+'\nSe enviar assim, a placa pode perder a atualização por Wi-Fi e só voltar por USB. Compilar mesmo assim?'))return;
+$('#go').onclick=()=>{if(!cur)return;const t=getCode(),a=analisar(t),av=[];
+ if(!a.ota)av.push('O código não tem interface OTA (a placa pode perder a atualização por Wi-Fi).');else if(!a.loopOk)av.push('O OTA está incompleto.');
+ if(a.erro)av.push('Há um texto sem fechar aspas.');
+ if(a.faltam.length)av.push('Faltam em bibliotecas.txt: '+a.faltam.join(', ')+'.');
+ if(a.locais.length)av.push('Usa arquivos locais que não serão enviados: '+a.locais.join(', ')+'.');
+ if(av.length&&!confirm(av.join('\n')+'\n\nCompilar mesmo assim?'))return;
  compilar(cur.nome,t,$('#placa').value)};
 
 function prog(p,etapa){$('#prog').hidden=false;$('#pct').textContent=Math.round(p);$('#fill').style.width=p+'%';
  $('#m1').className=etapa>=1?'ok':'';$('#m2').className=etapa==2?'now':etapa>2?'ok':'';$('#m3').className=etapa>=3?'ok':''}
 
 async function compilar(nome,txt,placa){
- if(busy||!ready())return;busy=true;$('#go').disabled=true;$('#res').hidden=true;msg('Enviando para o GitHub...');prog(5,1);
+ if(busy||!ready())return;busy=true;parar=false;$('#stop').hidden=false;$('#go').disabled=true;$('#res').hidden=true;msg('Enviando para o GitHub...');prog(5,1);
  try{
   const path=`/contents/sketches/${nome}/${nome}.ino`;
   const ex=await api(path),sha=ex.ok?(await ex.json()).sha:undefined;
@@ -223,7 +246,7 @@ async function compilar(nome,txt,placa){
   LS('pend',{nome,commit,placa,t:Date.now()});
   await acompanhar(nome,commit,placa,Date.now());
  }catch(e){msg(String(e.message||e),1);LS('pend',null);$('#prog').hidden=true}
- busy=false;$('#go').disabled=!cur;
+ busy=false;$('#stop').hidden=true;$('#go').disabled=!cur;
 }
 
 async function acompanhar(nome,commit,placa,t0){
@@ -231,18 +254,20 @@ async function acompanhar(nome,commit,placa,t0){
  for(let i=0;i<200;i++){
   const s=(Date.now()-t0)/1000;prog(Math.min(95,12+s/150*83),2);
   const r=await api('/actions/runs?head_sha='+commit);const j=await r.json();run=j.workflow_runs&&j.workflow_runs[0];
+  if(parar){parar=false;let c=null;if(run&&run.status!=='completed')c=await api(`/actions/runs/${run.id}/cancel`,{method:'POST'});
+   throw new Error(c&&c.status===202?'Compilação cancelada.':c?'Parei o acompanhamento, mas o GitHub continua compilando. Para cancelar, o token precisa da permissão "Actions: Read and write".':'Acompanhamento interrompido. Se a compilação já tinha começado, ela continua no GitHub.')}
   msg(run?`Compilando em ${bname(placa)}... ${Math.round(s)} s`:`Aguardando o GitHub iniciar... ${Math.round(s)} s`);
-  if(run&&run.status==='completed')break;await sleep(5000);
+  if(run&&run.status==='completed')break;await esperar(5000);
  }
  if(!run||run.status!=='completed')throw new Error('Tempo esgotado. Veja a aba Actions do repositório.');
- const lg=await api(`/contents/bin/${nome}.log.txt`,{headers:RAW});
- if(lg.ok){$('#log').textContent=(await lg.text()).slice(-6000);}
- if(run.conclusion!=='success'){
-  let et='';try{const jr=await api(`/actions/runs/${run.id}/jobs`),jj=await jr.json(),st=(jj.jobs||[]).flatMap(j=>j.steps||[]).find(x=>x.conclusion==='failure');if(st)et=st.name}catch(e){}
-  LS('pend',null);$('#prog').hidden=true;$('#logBox').open=true;
-  throw new Error('A compilação falhou'+(et?' na etapa "'+et+'"':'')+'.\nVeja o log abaixo ou a execução: '+run.html_url)}
+ const lg=await api(`/contents/bin/${nome}.log.txt`,{headers:RAW});let lt='';
+ if(lg.ok){lt=await lg.text();$('#log').textContent=lt.length>8000?lt.slice(0,5000)+'\n[...]\n'+lt.slice(-3000):lt}
  const lr=await api('/contents/bin'),lst=lr.ok?await lr.json():[],fi=Array.isArray(lst)&&lst.find(x=>x.name===nome+'.ino.bin');
- if(!fi){LS('pend',null);$('#prog').hidden=true;throw new Error('A compilação terminou, mas o arquivo não foi encontrado na pasta bin/ do repositório.')}
+ if(run.conclusion!=='success'||!fi){
+  const er=(lt.match(/^.*error:.*$/m)||[''])[0].replace(/^.*\/sketches\//,'').slice(0,220);let et='';
+  if(!er){try{const jr=await api(`/actions/runs/${run.id}/jobs`),jj=await jr.json(),st=(jj.jobs||[]).flatMap(j=>j.steps||[]).find(x=>x.conclusion==='failure');if(st)et=st.name}catch(e){}}
+  LS('pend',null);$('#prog').hidden=true;$('#logBox').open=true;
+  throw new Error('A compilação falhou'+(et?' na etapa "'+et+'"':'')+'.'+(er?'\n'+er:'')+'\nVeja o log completo abaixo.')}
  const size=fi.size;prog(100,3);LS('pend',null);
  lastBin=nome;$('#rname').textContent=nome+'.ino.bin';$('#rmeta').textContent=mb(size)+', compilado em '+quando(Date.now())+' para '+bname(placa);$('#res').hidden=false;
  if(cfg.ask)msg('Pronto! Toque em "Salvar em..." para escolher onde guardar.');else{msg('Pronto! Baixando...');await baixar(nome);msg('Pronto!')}
@@ -266,7 +291,8 @@ $('#rsv').onclick=()=>lastBin&&baixar(lastBin,true);
 async function carregar(){
  if(!cfg.repo||!cfg.token)return desenhar();
  try{const r=await api('/contents/dados.json');if(r.ok){const j=await r.json();dados={salvos:[],recentes:[],placas:[],...JSON.parse(unb64(j.content))}}}catch(e){}
- desenhar();
+ try{const r=await api('/contents/bibliotecas.txt',{headers:RAW});libsRepo=r.ok?(await r.text()).split(/\r?\n/).map(l=>l.trim()).filter(l=>l&&l[0]!=='#').map(l=>l.replace(/@.*$/,'').toLowerCase()):r.status===404?[]:null}catch(e){}
+ desenhar();if(cur)render();
 }
 async function gravar(){
  try{const r=await api('/contents/dados.json');const sha=r.ok?(await r.json()).sha:undefined;
@@ -290,6 +316,17 @@ function desenhar(){
  <div class="row"><button data-r="${esc(s.nome)}" data-p="${esc(s.placa)}">Abrir</button><button class="x" data-s="${esc(s.nome)}" data-p="${esc(s.placa)}">Remover</button></div></div>`).join('')
  +`<button class="sv add" id="addCur" type="button"><b>+</b><span>Salvar o último compilado</span></button>`;
  const ad=$('#addCur');if(ad)ad.onclick=()=>{const x=dados.recentes[0];x?(!salvo(x.nome)&&alternar(x.nome,x.placa)):msg('Compile um arquivo primeiro.',1)};
+}
+const esperar=async ms=>{for(let t=0;t<ms&&!parar;t+=500)await sleep(500)};
+$('#stop').onclick=()=>{parar=true;msg('Parando...')};
+async function addLib(nome){
+ if(!ready())return;msg('Atualizando bibliotecas.txt...');
+ const r=await api('/contents/bibliotecas.txt');let sha,txt='';
+ if(r.ok){const j=await r.json();sha=j.sha;txt=unb64(j.content)}
+ txt=txt.replace(/\s*$/,'')+'\n'+nome+'\n';
+ const w=await api('/contents/bibliotecas.txt',{method:'PUT',body:JSON.stringify({message:'adicionar biblioteca '+nome+' [skip ci]',content:b64(txt),sha})});
+ if(!w.ok)return msg('Não consegui atualizar o bibliotecas.txt.',1);
+ libsRepo=[...(libsRepo||[]),nome.toLowerCase()];render();msg('Biblioteca "'+nome+'" adicionada ao bibliotecas.txt.');
 }
 let editIdx=-1;
 function abrirDlg(i){editIdx=i;const p=dados.placas[i]||{};$('#dTit').textContent=i>=0?'Editar placa':'Nova placa';$('#pNome').value=p.nome||'';$('#pIp').value=p.ip||'';$('#pTipo').value=p.tipo||$('#placa').value;$('#pDev').value=p.dev||'';$('#dlg').showModal()}
@@ -375,9 +412,7 @@ void setup() {
   WiFi.setHostname(hostName.c_str());
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   while (WiFi.status() != WL_CONNECTED) { delay(300); Serial.print("."); }
-  Serial.printf("
-%s em http://%s
-", hostName.c_str(), WiFi.localIP().toString().c_str());
+  Serial.printf("\n%s em http://%s\n", hostName.c_str(), WiFi.localIP().toString().c_str());
   MDNS.begin(hostName.c_str());
   server.on("/", HTTP_GET, handleRoot);
   server.on("/update", HTTP_POST, handleUpdateDone, handleUpload);
@@ -395,9 +430,9 @@ void loop() {
 $('#novo').onclick=()=>{const n=slug((prompt('Nome do projeto (sem espaços):','meu_projeto')||'').trim());if(n)abrir(n,modelo())};
 
 document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
- if(b.dataset.s)alternar(b.dataset.s,b.dataset.p);else if(b.dataset.d)baixar(b.dataset.d,!!cfg.ask);else if(b.dataset.r)recompilar(b.dataset.r,b.dataset.p);else if(b.dataset.u)usar(+b.dataset.u);else if(b.dataset.e)editarPlaca(+b.dataset.e);else if(b.dataset.x)removerPlaca(+b.dataset.x)});
+ if(b.dataset.s)alternar(b.dataset.s,b.dataset.p);else if(b.dataset.d)baixar(b.dataset.d,!!cfg.ask);else if(b.dataset.r)recompilar(b.dataset.r,b.dataset.p);else if(b.dataset.u)usar(+b.dataset.u);else if(b.dataset.e)editarPlaca(+b.dataset.e);else if(b.dataset.x)removerPlaca(+b.dataset.x);else if(b.dataset.lib)addLib(b.dataset.lib)});
 
 (async()=>{await carregar();const p=LS('pend');
- if(p&&cfg.repo&&cfg.token&&Date.now()-p.t<30*60000){busy=true;$('#go').disabled=true;
-  try{await acompanhar(p.nome,p.commit,p.placa,p.t)}catch(e){msg(String(e.message||e),1)}busy=false;$('#go').disabled=!cur}})();
+ if(p&&cfg.repo&&cfg.token&&Date.now()-p.t<30*60000){busy=true;parar=false;$('#stop').hidden=false;$('#go').disabled=true;
+  try{await acompanhar(p.nome,p.commit,p.placa,p.t)}catch(e){msg(String(e.message||e),1);LS('pend',null);$('#prog').hidden=true}busy=false;$('#stop').hidden=true;$('#go').disabled=!cur}})();
 </script></body></html>
