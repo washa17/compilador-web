@@ -2,6 +2,16 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <title>Compilador ESP32</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0d1a">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/clike/clike.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Figtree:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -64,6 +74,23 @@ pre{margin:14px 0 0;padding:14px;background:var(--bg);border-radius:12px;overflo
 .fld input{flex:1;min-width:0;padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg)}
 .fld button{border:1px solid var(--line);background:var(--card2);border-radius:12px;padding:0 14px;font-weight:700}
 #code{display:block;width:100%;height:320px;resize:vertical;padding:12px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:#d7defa;font:400 .78rem/1.55 ui-monospace,Menlo,Consolas,monospace;white-space:pre;overflow:auto;tab-size:2}
+.CodeMirror{height:360px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:#d7defa;font:400 .8rem/1.55 ui-monospace,Menlo,Consolas,monospace}
+.CodeMirror-gutters{background:var(--bg);border-right:1px solid var(--line)}.CodeMirror-linenumber{color:#4f5a85}
+.CodeMirror-cursor{border-left:2px solid #fff}.CodeMirror-selected{background:#2a3770!important}.CodeMirror-matchingbracket{color:#fff!important;background:#3a4a99}
+.cm-keyword{color:#c792ea}.cm-type,.cm-variable-3,.cm-variable-2{color:#7fdbca}.cm-builtin,.cm-def{color:#82aaff}.cm-string,.cm-string-2{color:#c3e88d}
+.cm-comment{color:#6b769e;font-style:italic}.cm-number,.cm-atom{color:#f78c6c}.cm-meta{color:#ffcb6b}.cm-variable,.cm-operator{color:#d7defa}
+.sym{display:flex;gap:6px;overflow-x:auto;margin-bottom:8px;padding-bottom:2px}
+.sym button{flex:none;min-width:38px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card2);font:600 .95rem ui-monospace,monospace}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.ghost{border:1px solid var(--line);background:transparent;border-radius:999px;padding:10px 16px;font-weight:700;color:#8fa0ff}
+.dl.alt{margin-top:10px;background:transparent;color:var(--ink);border:1px solid var(--line)}
+.sv .row a{font-weight:700;font-size:.92rem;color:#8fa0ff;text-decoration:none}
+.chk{display:flex;gap:10px;align-items:center;margin-top:14px;font-size:.92rem}.chk input{width:20px;height:20px}
+dialog{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:22px;padding:22px;width:min(92vw,420px)}
+dialog::backdrop{background:rgba(5,7,15,.75)}dialog h2{margin-bottom:6px}
+.field select{width:100%;border-radius:14px;padding:12px;background:var(--bg);border:1.5px solid var(--line)}
+.btns{display:flex;gap:10px;margin-top:18px}.btns button{flex:1;border-radius:999px;padding:12px;font-weight:700;border:1px solid var(--line);background:transparent}
+.btns .p{background:var(--blue);border-color:var(--blue);color:#fff}
 </style></head><body><main>
 <div class="top"><div class="brand"><span class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg></span>Compilador</div>
 <select id="placa" aria-label="Placa"></select></div>
@@ -71,11 +98,13 @@ pre{margin:14px 0 0;padding:14px;background:var(--bg);border-radius:12px;overflo
 <p class="lead">Envie o seu código, espere a compilação e baixe o arquivo pronto para atualizar a placa pelo OTA.</p>
 <input type="file" id="file" accept=".ino" hidden>
 <button class="drop" id="drop" type="button"><span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8fa0ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg></span><div><b id="fname">Escolher arquivo .ino</b><span>Toque para escolher</span></div></button>
+<div class="acts"><button class="ghost" id="novo" type="button">Novo projeto</button><button class="ghost" id="inst" type="button" hidden>Instalar como app</button></div>
 <section class="ed" id="ed" hidden>
 <div class="edh"><h2>Editor</h2><span class="badge" id="badge"></span></div>
 <ul class="ckl" id="ck"></ul>
 <label class="fld" id="fVer" hidden><span>Versão do firmware</span><div><input id="inVer" autocapitalize="off"><button type="button" id="bump">+1</button></div></label>
 <label class="fld" id="fDev" hidden><span>DEVICE_ID</span><div><input id="inDev" inputmode="numeric"></div></label>
+<div class="sym" id="sym"></div>
 <textarea id="code" spellcheck="false" autocapitalize="off" autocorrect="off" wrap="off" aria-label="Código"></textarea>
 </section>
 <button class="go" id="go" type="button" disabled>Compilar</button>
@@ -83,21 +112,31 @@ pre{margin:14px 0 0;padding:14px;background:var(--bg);border-radius:12px;overflo
 <section id="prog" hidden><p class="num"><span id="pct">0</span><small>%</small></p><div class="bar"><i id="fill"></i></div>
 <div class="marks"><span id="m1">Enviado</span><span id="m2">Compilando</span><span id="m3">Pronto</span></div></section>
 <section class="res" id="res" hidden><p class="k">Arquivo pronto</p><p class="name" id="rname"></p><p class="meta" id="rmeta"></p>
-<button class="dl" id="rdl" type="button">Baixar de novo</button><p class="hint">Agora abra a página da placa e envie este arquivo.</p></section>
+<button class="dl" id="rdl" type="button">Baixar de novo</button><button class="dl alt" id="rsv" type="button">Salvar em...</button><p class="hint">Agora abra a página da placa e envie este arquivo.</p></section>
+<section class="lib"><h2>Minhas placas</h2><div class="saved" id="brd"></div></section>
 <section class="lib"><h2>Recentes</h2><ul class="list" id="rec"></ul></section>
 <section class="lib"><h2>Salvos</h2><div class="saved" id="sav"></div></section>
 <details id="logBox"><summary>Log da compilação</summary><pre id="log">Nenhuma compilação ainda.</pre></details>
 <details id="cfgBox"><summary>Configuração do GitHub</summary>
 <label class="field"><span>Repositório</span><input id="repo" placeholder="usuario/compilador-esp" autocapitalize="off"></label>
 <label class="field"><span>Token</span><input id="token" type="password"></label>
+<label class="field"><span>Wi-Fi para novos projetos (rede)</span><input id="ssid" autocapitalize="off"></label>
+<label class="field"><span>Wi-Fi para novos projetos (senha)</span><input id="wpass" type="password"></label>
+<label class="chk"><input type="checkbox" id="ask">Perguntar onde salvar o .bin</label>
 <button class="save" id="cfgSave" type="button">Salvar</button></details>
 </main>
+<dialog id="dlg"><h2 id="dTit">Placa</h2>
+<label class="field"><span>Nome</span><input id="pNome" placeholder="esp32c3-1"></label>
+<label class="field"><span>Endereço (IP ou nome .local)</span><input id="pIp" placeholder="192.168.0.105" autocapitalize="off" inputmode="url"></label>
+<label class="field"><span>Tipo de placa</span><select id="pTipo"></select></label>
+<label class="field"><span>DEVICE_ID (opcional)</span><input id="pDev" inputmode="numeric"></label>
+<div class="btns"><button type="button" id="pCan">Cancelar</button><button type="button" class="p" id="pSave">Salvar</button></div></dialog>
 <script>
 const $=s=>document.querySelector(s),sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const LS=(k,v)=>{try{if(v===undefined)return JSON.parse(localStorage.getItem(k));v===null?localStorage.removeItem(k):localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}};
 const BOARDS=[["ESP32","esp32:esp32:esp32:PartitionScheme=default"],["ESP32-C3","esp32:esp32:esp32c3:CDCOnBoot=cdc,PartitionScheme=default"],["ESP32-S3","esp32:esp32:esp32s3:CDCOnBoot=cdc,PartitionScheme=default"],["ESP32-S2","esp32:esp32:esp32s2:PartitionScheme=default"],["ESP32-C6","esp32:esp32:esp32c6:CDCOnBoot=cdc,PartitionScheme=default"]];
 const bname=v=>(BOARDS.find(b=>b[1]===v)||[v])[0];
-let cfg=LS('cfg')||{},dados={salvos:[],recentes:[]},cur=null,busy=false,lastBin=null;
+let cfg=LS('cfg')||{},dados={salvos:[],recentes:[],placas:[]},cur=null,busy=false,lastBin=null;
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const slug=n=>n.replace(/\.ino$/i,'').replace(/[^A-Za-z0-9_-]/g,'_');
 const b64=t=>{let s='';new TextEncoder().encode(t).forEach(c=>s+=String.fromCharCode(c));return btoa(s)};
@@ -112,14 +151,25 @@ const star=on=>`<svg width="18" height="18" viewBox="0 0 24 24" fill="${on?'#ffc
 const dlIc=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#eef0ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M6 12l6 6 6-6M4 21h16"/></svg>`;
 const ready=()=>{if(cfg.repo&&cfg.token)return true;$('#cfgBox').open=true;msg('Preencha o repositório e o token na configuração.',1);return false};
 
-BOARDS.forEach(b=>$('#placa').add(new Option(b[0],b[1])));
+BOARDS.forEach(b=>{$('#placa').add(new Option(b[0],b[1]));$('#pTipo').add(new Option(b[0],b[1]))});
+let cm=null;
+try{cm=CodeMirror.fromTextArea($('#code'),{mode:'text/x-c++src',lineNumbers:true,matchBrackets:true,autoCloseBrackets:true,indentUnit:2,tabSize:2,indentWithTabs:false,extraKeys:{Tab:c=>c.replaceSelection('  ')}});cm.on('change',()=>render())}catch(e){cm=null}
+const getCode=()=>cm?cm.getValue():$('#code').value;
+const setCode=v=>{if(cm){const i=cm.getScrollInfo();cm.setValue(v);cm.scrollTo(i.left,i.top)}else $('#code').value=v};
+$('#sym').innerHTML=['Tab',...'{}()[];"\'#<>=/&|!*+-_'].map(c=>`<button type="button" data-c="${esc(c)}">${esc(c)}</button>`).join('');
+$('#sym').addEventListener('pointerdown',e=>e.preventDefault());
+$('#sym').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const c=b.dataset.c==='Tab'?'  ':b.dataset.c;
+ if(cm){cm.replaceSelection(c);cm.focus()}else{const t=$('#code');t.setRangeText(c,t.selectionStart,t.selectionEnd,'end');render()}});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+let instEv=null;addEventListener('beforeinstallprompt',e=>{e.preventDefault();instEv=e;$('#inst').hidden=false});
+$('#inst').onclick=async()=>{if(!instEv)return;instEv.prompt();await instEv.userChoice;instEv=null;$('#inst').hidden=true};
 $('#placa').value=LS('placa')||BOARDS[1][1];$('#placa').onchange=()=>LS('placa',$('#placa').value);
-$('#repo').value=cfg.repo||'';$('#token').value=cfg.token||'';if(!cfg.repo||!cfg.token)$('#cfgBox').open=true;
-$('#cfgSave').onclick=()=>{cfg={repo:$('#repo').value.trim(),token:$('#token').value.trim()};LS('cfg',cfg);$('#cfgBox').open=false;msg('Configuração salva.');carregar()};
+$('#repo').value=cfg.repo||'';$('#token').value=cfg.token||'';$('#ssid').value=cfg.ssid||'';$('#wpass').value=cfg.wpass||'';$('#ask').checked=!!cfg.ask;if(!cfg.repo||!cfg.token)$('#cfgBox').open=true;
+$('#cfgSave').onclick=()=>{cfg={...cfg,repo:$('#repo').value.trim(),token:$('#token').value.trim(),ssid:$('#ssid').value.trim(),wpass:$('#wpass').value,ask:$('#ask').checked};LS('cfg',cfg);$('#cfgBox').open=false;msg('Configuração salva.');carregar()};
 
 $('#drop').onclick=()=>$('#file').click();
 $('#file').onchange=async()=>{const f=$('#file').files[0];if(f)abrir(slug(f.name),await f.text())};
-function abrir(nome,txt){cur={nome};$('#fname').textContent=nome+'.ino';$('#code').value=limpa(txt);$('#ed').hidden=false;$('#go').disabled=false;render();msg('')}
+function abrir(nome,txt){cur={nome};$('#fname').textContent=nome+'.ino';$('#ed').hidden=false;setCode(limpa(txt));$('#go').disabled=false;cm&&cm.refresh();render();msg('')}
 
 const VER=/^(\s*#define\s+(?:FW_VERSION|FIRMWARE_VERSION|VERSION|VERSAO|FW_VER)\s+")([^"]*)(")/m;
 const DEV=/^(\s*#define\s+DEVICE_ID\s+)(\d+)/m;
@@ -141,7 +191,7 @@ function analisar(t){
  return{ota,loopOk,it};
 }
 function render(){
- const t=$('#code').value,a=analisar(t),b=$('#badge'),bom=a.ota&&a.loopOk;
+ const t=getCode(),a=analisar(t),b=$('#badge'),bom=a.ota&&a.loopOk;
  $('#ck').innerHTML=a.it.map(x=>`<li class="${x.c}"><i>${x.c==='ok'?'✓':'✕'}</i><span>${esc(x.t)}${x.d?`<small>${esc(x.d)}</small>`:''}</span></li>`).join('');
  b.textContent=bom?'OTA ok':a.ota?'OTA incompleto':'Sem OTA';b.className='badge '+(bom?'ok':'bad');
  const v=t.match(VER),d=t.match(DEV);$('#fVer').hidden=!v;$('#fDev').hidden=!d;
@@ -149,12 +199,12 @@ function render(){
  if(d&&document.activeElement!==$('#inDev'))$('#inDev').value=d[2];
  return a;
 }
-const setVer=x=>{$('#code').value=$('#code').value.replace(VER,(m,a,b,c)=>a+x.replace(/["\\\n]/g,'')+c);render()};
+const setVer=x=>{setCode(getCode().replace(VER,(m,a,b,c)=>a+x.replace(/["\\\n]/g,'')+c));render()};
 $('#code').oninput=render;
 $('#inVer').oninput=e=>setVer(e.target.value);
-$('#inDev').oninput=e=>{$('#code').value=$('#code').value.replace(DEV,(m,a)=>a+(e.target.value.replace(/\D/g,'')||'0'));render()};
-$('#bump').onclick=()=>{const v=$('#code').value.match(VER);if(!v)return;const n=/\d/.test(v[2])?v[2].replace(/(\d+)(?!.*\d)/,m=>+m+1):v[2]+' 2';$('#inVer').value=n;setVer(n)};
-$('#go').onclick=()=>{if(!cur)return;const t=$('#code').value,a=analisar(t),ruim=a.it.find(x=>x.c==='bad');
+$('#inDev').oninput=e=>{setCode(getCode().replace(DEV,(m,a)=>a+(e.target.value.replace(/\D/g,'')||'0')));render()};
+$('#bump').onclick=()=>{const v=getCode().match(VER);if(!v)return;const n=/\d/.test(v[2])?v[2].replace(/(\d+)(?!.*\d)/,m=>+m+1):v[2]+' 2';$('#inVer').value=n;setVer(n)};
+$('#go').onclick=()=>{if(!cur)return;const t=getCode(),a=analisar(t),ruim=a.it.find(x=>x.c==='bad');
  if((!a.ota||!a.loopOk)&&!confirm((a.ota?'O OTA está incompleto: '+ruim.t+'.':'O código não tem interface OTA.')+'\nSe enviar assim, a placa pode perder a atualização por Wi-Fi e só voltar por USB. Compilar mesmo assim?'))return;
  compilar(cur.nome,t,$('#placa').value)};
 
@@ -195,20 +245,27 @@ async function acompanhar(nome,commit,placa,t0){
  if(!fi){LS('pend',null);$('#prog').hidden=true;throw new Error('A compilação terminou, mas o arquivo não foi encontrado na pasta bin/ do repositório.')}
  const size=fi.size;prog(100,3);LS('pend',null);
  lastBin=nome;$('#rname').textContent=nome+'.ino.bin';$('#rmeta').textContent=mb(size)+', compilado em '+quando(Date.now())+' para '+bname(placa);$('#res').hidden=false;
- msg('Pronto! Baixando...');await baixar(nome);msg('Pronto!');
+ if(cfg.ask)msg('Pronto! Toque em "Salvar em..." para escolher onde guardar.');else{msg('Pronto! Baixando...');await baixar(nome);msg('Pronto!')}
  dados.recentes=[{nome,t:Date.now(),placa,size},...dados.recentes.filter(x=>x.nome!==nome)].slice(0,10);
  await gravar();desenhar();
 }
 
-async function baixar(nome){
+async function baixar(nome,escolher){
+ const fn=nome+'.ino.bin';let h=null;
+ if(escolher&&window.showSaveFilePicker){try{h=await showSaveFilePicker({suggestedName:fn,types:[{description:'Firmware',accept:{'application/octet-stream':['.bin']}}]})}catch(e){if(e.name==='AbortError')return}}
  const b=await api(`/contents/bin/${nome}.ino.bin`,{headers:RAW});if(!b.ok)return msg('Não achei o arquivo compilado.',1);
- const a=document.createElement('a');a.href=URL.createObjectURL(await b.blob());a.download=nome+'.ino.bin';a.click();
+ const blob=await b.blob();
+ if(h){const w=await h.createWritable();await w.write(blob);await w.close();return msg('Salvo na pasta escolhida.')}
+ if(escolher){const f=new File([blob],fn,{type:'application/octet-stream'});
+  if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:fn});return}catch(e){if(e.name==='AbortError')return}}}
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();
 }
-$('#rdl').onclick=()=>lastBin&&baixar(lastBin);
+$('#rdl').onclick=()=>lastBin&&baixar(lastBin,!!cfg.ask);
+$('#rsv').onclick=()=>lastBin&&baixar(lastBin,true);
 
 async function carregar(){
  if(!cfg.repo||!cfg.token)return desenhar();
- try{const r=await api('/contents/dados.json');if(r.ok){const j=await r.json();dados={salvos:[],recentes:[],...JSON.parse(unb64(j.content))}}}catch(e){}
+ try{const r=await api('/contents/dados.json');if(r.ok){const j=await r.json();dados={salvos:[],recentes:[],placas:[],...JSON.parse(unb64(j.content))}}}catch(e){}
  desenhar();
 }
 async function gravar(){
@@ -225,6 +282,7 @@ async function recompilar(nome,placa){
  abrir(nome,await r.text());$('#placa').value=placa;LS('placa',placa);msg('Código aberto no editor. Edite o que precisar e toque em Compilar.');$('#ed').scrollIntoView({behavior:'smooth'});
 }
 function desenhar(){
+ pintarPlacas();
  $('#rec').innerHTML=dados.recentes.length?dados.recentes.map(x=>`<li><div class="txt"><b>${esc(x.nome)}.ino.bin</b><small>${mb(x.size)}, ${quando(x.t)}, ${esc(bname(x.placa))}</small></div>
  <button class="ib ${salvo(x.nome)?'on':''}" data-s="${esc(x.nome)}" data-p="${esc(x.placa)}" aria-label="Salvar">${star(salvo(x.nome))}</button>
  <button class="ib" data-d="${esc(x.nome)}" aria-label="Baixar">${dlIc}</button></li>`).join(''):'<li class="empty">Os arquivos que você compilar aparecem aqui.</li>';
@@ -233,8 +291,111 @@ function desenhar(){
  +`<button class="sv add" id="addCur" type="button"><b>+</b><span>Salvar o último compilado</span></button>`;
  const ad=$('#addCur');if(ad)ad.onclick=()=>{const x=dados.recentes[0];x?(!salvo(x.nome)&&alternar(x.nome,x.placa)):msg('Compile um arquivo primeiro.',1)};
 }
+let editIdx=-1;
+function abrirDlg(i){editIdx=i;const p=dados.placas[i]||{};$('#dTit').textContent=i>=0?'Editar placa':'Nova placa';$('#pNome').value=p.nome||'';$('#pIp').value=p.ip||'';$('#pTipo').value=p.tipo||$('#placa').value;$('#pDev').value=p.dev||'';$('#dlg').showModal()}
+function pintarPlacas(){
+ $('#brd').innerHTML=(dados.placas||[]).map((p,i)=>`<div class="sv"><b>${esc(p.nome)}</b><small>${esc(bname(p.tipo))}${p.dev?' | ID '+esc(p.dev):''}<br>${esc(p.ip)}</small>
+ <div class="row"><a href="http://${esc(String(p.ip).replace(/^https?:\/\//,''))}" target="_blank" rel="noopener">Abrir OTA</a><button data-u="${i}">Usar</button></div>
+ <div class="row"><button class="x" data-e="${i}">Editar</button><button class="x" data-x="${i}">Remover</button></div></div>`).join('')
+ +'<button class="sv add" id="addP" type="button"><b>+</b><span>Adicionar placa</span></button>';
+ $('#addP').onclick=()=>abrirDlg(-1);
+}
+function usar(i){const p=dados.placas[i];$('#placa').value=p.tipo;LS('placa',p.tipo);
+ if(cur&&p.dev&&DEV.test(getCode()))setCode(getCode().replace(DEV,(m,a)=>a+p.dev));
+ msg('Placa "'+p.nome+'" selecionada'+(p.dev?', DEVICE_ID '+p.dev:'')+'.')}
+$('#pCan').onclick=()=>$('#dlg').close();
+$('#pSave').onclick=()=>{const p={nome:$('#pNome').value.trim()||'Placa',ip:$('#pIp').value.trim(),tipo:$('#pTipo').value,dev:$('#pDev').value.replace(/\D/g,'')};if(!p.ip)return $('#pIp').focus();
+ if(editIdx>=0)dados.placas[editIdx]=p;else dados.placas.push(p);$('#dlg').close();desenhar();gravar()};
+const editarPlaca=i=>abrirDlg(i);
+function removerPlaca(i){if(confirm('Remover "'+dados.placas[i].nome+'"?')){dados.placas.splice(i,1);desenhar();gravar()}}
+const modelo=()=>String.raw`#include <WiFi.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
+#include <Update.h>
+
+#define DEVICE_ID 1
+#define FW_VERSION "v1"
+const char* WIFI_SSID = "${cfg.ssid||'SUA_REDE'}";
+const char* WIFI_PASS = "${cfg.wpass||'SUA_SENHA'}";
+const char* OTA_USER  = "admin";
+const char* OTA_PASS  = "ota1234";
+
+WebServer server(80);
+String hostName;
+
+const char PAGE[] PROGMEM = R"rawliteral(
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>%NAME%</title></head><body style="font-family:sans-serif;max-width:420px;margin:30px auto;padding:0 16px">
+<h2>%NAME%</h2><p>IP %IP% | Versão %VER%</p>
+<form id="f"><input type="file" id="file" accept=".bin" required><br><br><button>Enviar firmware</button></form>
+<p id="msg"></p>
+<script>
+f.onsubmit=e=>{e.preventDefault();const x=new XMLHttpRequest(),d=new FormData();d.append('firmware',file.files[0]);
+x.upload.onprogress=p=>{if(p.lengthComputable)msg.innerText=Math.round(p.loaded/p.total*100)+'%'};
+x.onload=()=>{msg.innerText=x.status==200?'Sucesso! Reiniciando...':'Erro: '+x.responseText;if(x.status==200)setTimeout(()=>location.reload(),6000)};
+x.open('POST','/update');x.send(d)}
+${'</scr'+'ipt>'}</body></html>
+)rawliteral";
+
+bool auth() {
+  if (!server.authenticate(OTA_USER, OTA_PASS)) { server.requestAuthentication(); return false; }
+  return true;
+}
+
+void handleRoot() {
+  if (!auth()) return;
+  String p = FPSTR(PAGE);
+  p.replace("%NAME%", hostName);
+  p.replace("%IP%", WiFi.localIP().toString());
+  p.replace("%VER%", FW_VERSION);
+  server.send(200, "text/html", p);
+}
+
+void handleUpdateDone() {
+  if (!auth()) return;
+  bool ok = !Update.hasError();
+  server.sendHeader("Connection", "close");
+  server.send(ok ? 200 : 500, "text/plain", ok ? "OK" : Update.errorString());
+  delay(500);
+  if (ok) ESP.restart();
+}
+
+void handleUpload() {
+  if (!server.authenticate(OTA_USER, OTA_PASS)) return;
+  HTTPUpload& up = server.upload();
+  if (up.status == UPLOAD_FILE_START) Update.begin(UPDATE_SIZE_UNKNOWN);
+  else if (up.status == UPLOAD_FILE_WRITE) Update.write(up.buf, up.currentSize);
+  else if (up.status == UPLOAD_FILE_END) { if (!Update.end(true)) Update.printError(Serial); }
+}
+
+void setup() {
+  Serial.begin(115200);
+  hostName = "esp32-" + String(DEVICE_ID);
+  WiFi.mode(WIFI_STA);
+  WiFi.setHostname(hostName.c_str());
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  while (WiFi.status() != WL_CONNECTED) { delay(300); Serial.print("."); }
+  Serial.printf("
+%s em http://%s
+", hostName.c_str(), WiFi.localIP().toString().c_str());
+  MDNS.begin(hostName.c_str());
+  server.on("/", HTTP_GET, handleRoot);
+  server.on("/update", HTTP_POST, handleUpdateDone, handleUpload);
+  server.begin();
+
+  // ===== SEU CÓDIGO (setup) AQUI =====
+}
+
+void loop() {
+  server.handleClient();
+
+  // ===== SEU CÓDIGO (loop) AQUI =====
+}
+`;
+$('#novo').onclick=()=>{const n=slug((prompt('Nome do projeto (sem espaços):','meu_projeto')||'').trim());if(n)abrir(n,modelo())};
+
 document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
- if(b.dataset.s)alternar(b.dataset.s,b.dataset.p);else if(b.dataset.d)baixar(b.dataset.d);else if(b.dataset.r)recompilar(b.dataset.r,b.dataset.p)});
+ if(b.dataset.s)alternar(b.dataset.s,b.dataset.p);else if(b.dataset.d)baixar(b.dataset.d,!!cfg.ask);else if(b.dataset.r)recompilar(b.dataset.r,b.dataset.p);else if(b.dataset.u)usar(+b.dataset.u);else if(b.dataset.e)editarPlaca(+b.dataset.e);else if(b.dataset.x)removerPlaca(+b.dataset.x)});
 
 (async()=>{await carregar();const p=LS('pend');
  if(p&&cfg.repo&&cfg.token&&Date.now()-p.t<30*60000){busy=true;$('#go').disabled=true;
