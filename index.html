@@ -111,7 +111,7 @@ dialog::backdrop{background:rgba(5,7,15,.75)}dialog h2{margin-bottom:6px}
 <section class="ed" id="ed" hidden>
 <div class="edh"><h2>Editor</h2><span class="badge" id="badge"></span></div>
 <ul class="ckl" id="ck"></ul>
-<button type="button" class="addr" id="addr" hidden><span>Endereço da tela (toque para alterar)</span><b id="addrV"></b><i>Alterar</i></button>
+<button type="button" class="addr" id="addr" hidden><span>Link da tela (toque para alterar)</span><b id="addrV"></b><i>Alterar</i></button>
 <label class="fld" id="fVer" hidden><span>Versão do firmware</span><div><input id="inVer" autocapitalize="off"><button type="button" id="bump">+1</button></div></label>
 <label class="fld" id="fDev" hidden><span>DEVICE_ID</span><div><input id="inDev" inputmode="numeric"></div></label>
 <div class="sym" id="sym"></div>
@@ -138,13 +138,14 @@ dialog::backdrop{background:rgba(5,7,15,.75)}dialog h2{margin-bottom:6px}
 </main>
 <dialog id="dlg"><h2 id="dTit">Placa</h2>
 <label class="field"><span>Nome</span><input id="pNome" placeholder="esp32c3-1"></label>
-<label class="field"><span>Endereço (IP ou nome .local)</span><input id="pIp" placeholder="192.168.0.105" autocapitalize="off" inputmode="url"></label>
+<label class="field"><span>Nome na rede (sem .local)</span><input id="pHost" placeholder="servebot-1" autocapitalize="off" autocomplete="off"></label>
+<label class="field"><span>IP de reserva (opcional)</span><input id="pIp" placeholder="192.168.0.105" autocapitalize="off" inputmode="url"></label>
 <label class="field"><span>Tipo de placa</span><select id="pTipo"></select></label>
 <label class="field"><span>DEVICE_ID (opcional)</span><input id="pDev" inputmode="numeric"></label>
 <div class="btns"><button type="button" id="pCan">Cancelar</button><button type="button" class="p" id="pSave">Salvar</button></div></dialog>
-<dialog id="dAddr"><h2>Endereço da tela</h2>
-<p style="margin:0;color:var(--mut);font-size:.9rem">Esse IP vira o endereço fixo da página da placa no código. Deixe vazio para automático (DHCP).</p>
-<label class="field"><span>IP da placa</span><input id="aIp" inputmode="decimal" placeholder="192.168.0.105" autocapitalize="off"></label>
+<dialog id="dAddr"><h2>Link da tela</h2>
+<p style="margin:0;color:var(--mut);font-size:.9rem">A placa vai abrir em <b id="aPrev"></b>. Esse nome é gravado no código antes de compilar.</p>
+<label class="field"><span>Nome na rede (sem .local)</span><input id="aIp" placeholder="servebot-1" autocapitalize="off" autocomplete="off"></label>
 <p id="aErr" style="margin:8px 0 0;color:var(--err);font-size:.9rem;min-height:1.2em"></p>
 <div class="btns"><button type="button" id="aCan">Cancelar</button><button type="button" class="p" id="aSave">Aplicar no código</button></div></dialog>
 <script>
@@ -189,8 +190,8 @@ function abrir(nome,txt){cur={nome};$('#fname').textContent=nome+'.ino';$('#ed')
 
 const VER=/^(\s*#define\s+(?:FW_VERSION|FIRMWARE_VERSION|VERSION|VERSAO|FW_VER)\s+")([^"]*)(")/m;
 const DEV=/^(\s*#define\s+DEVICE_ID\s+)(\d+)/m;
-const ADDR=/^(\s*#define\s+DEVICE_IP\s+")([^"]*)(")/m;
-const ipOk=v=>/^(\d{1,3}\.){3}\d{1,3}$/.test(v)&&v.split('.').every(n=>+n<=255);
+const ADDR=/^(\s*#define\s+DEVICE_NAME\s+")([^"]*)(")/m;
+const nomeOk=v=>/^[a-z0-9]([a-z0-9-]{0,40}[a-z0-9])?$/i.test(v);
 const LIBS={'Arduino_GFX_Library.h':'GFX Library for Arduino','PubSubClient.h':'PubSubClient','ArduinoJson.h':'ArduinoJson','Adafruit_GFX.h':'Adafruit GFX Library','Adafruit_SSD1306.h':'Adafruit SSD1306','Adafruit_Sensor.h':'Adafruit Unified Sensor','DHT.h':'DHT sensor library','FastLED.h':'FastLED','Adafruit_NeoPixel.h':'Adafruit NeoPixel','ESP32Servo.h':'ESP32Servo','Servo.h':'ESP32Servo','LiquidCrystal_I2C.h':'LiquidCrystal I2C','TFT_eSPI.h':'TFT_eSPI','U8g2lib.h':'U8g2','OneWire.h':'OneWire','DallasTemperature.h':'DallasTemperature','Adafruit_BME280.h':'Adafruit BME280 Library','NewPing.h':'NewPing','ElegantOTA.h':'ElegantOTA','WiFiManager.h':'WiFiManager','lvgl.h':'lvgl','XPT2046_Touchscreen.h':'XPT2046_Touchscreen','TJpg_Decoder.h':'TJpg_Decoder','ESPAsyncWebServer.h':'ESP Async WebServer','AsyncTCP.h':'Async TCP','Adafruit_ILI9341.h':'Adafruit ILI9341','Adafruit_ST7735.h':'Adafruit ST7735 and ST7789 Library','MFRC522.h':'MFRC522','IRremote.h':'IRremote','AccelStepper.h':'AccelStepper','Bounce2.h':'Bounce2','RTClib.h':'RTClib','HX711.h':'HX711','TinyGPS++.h':'TinyGPSPlus','WebSocketsServer.h':'WebSockets'};
 const CORE=/^(arduino|wifi\w*|webserver|espmdns|update|http\w*|spi|wire|fs|spiffs|littlefs|sd|sd_mmc|preferences|eeprom|arduinoota|dnsserver|ticker|bluetooth\w*|ble\w*|hardwareserial|usb\w*|network\w*|time|pins_arduino|print|stream|ipaddress|client|server|udp|wstring|hwcdc|esp_\w+|lwip\w*|mbedtls\w*|freertos\w*|driver|soc|hal|stdio|stdlib|string|math|stdint|stdbool|ctype|limits|inttypes)$/i;
 function analisar(t){
@@ -208,6 +209,8 @@ function analisar(t){
  it.push(T(/WiFi\s*\.\s*(begin|softAP)\s*\(/)?{c:'ok',t:'Conexão Wi-Fi encontrada'}:{c:'bad',t:'Sem WiFi.begin ou WiFi.softAP',d:'A placa não vai ficar acessível pela rede.'});
  it.push(T(/void\s+setup\s*\(/)&&T(/void\s+loop\s*\(/)?{c:'ok',t:'setup() e loop() presentes'}:{c:'bad',t:'Faltam setup() ou loop()'});
  it.push(bal?{c:'ok',t:'Chaves e parênteses balanceados'}:{c:'bad',t:'Chaves ou parênteses desbalanceados',d:'Provável erro de digitação.'});
+ const nm=k.match(/^\s*#define\s+DEVICE_NAME\s+"([^"]*)"/m);
+ if(nm&&!nomeOk(nm[1]))it.push({c:'bad',t:'Nome na rede inválido: "'+nm[1]+'"',d:'Use só letras, números e hífen, sem espaços nem "_".'});
  const erro=/["']/.test(s.replace(/""/g,''));
  if(erro)it.push({c:'bad',t:'Texto sem fechar aspas',d:'Provável quebra de linha dentro de uma string: use \\n em vez de pular a linha.'});
  const faltam=[],locais=[],desc=[],achadas=[];
@@ -227,7 +230,7 @@ function render(){
  const t=getCode(),a=analisar(t),b=$('#badge'),bom=a.ota&&a.loopOk;
  $('#ck').innerHTML=a.it.map(x=>`<li class="${x.c}"><i>${x.c==='ok'?'✓':x.c==='warn'?'!':'✕'}</i><span>${esc(x.t)}${x.d?`<small>${esc(x.d)}</small>`:''}</span>${x.lib?`<button class="mini" type="button" data-lib="${esc(x.lib)}">Adicionar</button>`:''}</li>`).join('');
  b.textContent=bom?'OTA ok':a.ota?'OTA incompleto':'Sem OTA';b.className='badge '+(bom?'ok':'bad');
- const v=t.match(VER),d=t.match(DEV);$('#fVer').hidden=!v;$('#fDev').hidden=!d;const ad=t.match(ADDR);$('#addr').hidden=!ad;if(ad)$('#addrV').textContent=ad[2]?'http://'+ad[2]:'Automático (DHCP)';
+ const v=t.match(VER),d=t.match(DEV);$('#fVer').hidden=!v;$('#fDev').hidden=!d;const ad=t.match(ADDR);$('#addr').hidden=!ad;if(ad)$('#addrV').textContent=ad[2]?'http://'+ad[2]+'.local':'Defina um nome na rede';
  if(v&&document.activeElement!==$('#inVer'))$('#inVer').value=v[2];
  if(d&&document.activeElement!==$('#inDev'))$('#inDev').value=d[2];
  return a;
@@ -240,6 +243,7 @@ $('#bump').onclick=()=>{const v=getCode().match(VER);if(!v)return;const n=/\d/.t
 $('#go').onclick=()=>{if(!cur)return;const t=getCode(),a=analisar(t),av=[];
  if(!a.ota)av.push('O código não tem interface OTA (a placa pode perder a atualização por Wi-Fi).');else if(!a.loopOk)av.push('O OTA está incompleto.');
  if(a.erro)av.push('Há um texto sem fechar aspas.');
+ if(a.it.some(x=>x.c==='bad'&&/Nome na rede/.test(x.t)))av.push('O nome na rede (DEVICE_NAME) é inválido.');
  if(a.faltam.length)av.push('Faltam em bibliotecas.txt: '+a.faltam.join(', ')+'.');
  if(a.locais.length)av.push('Usa arquivos locais que não serão enviados: '+a.locais.join(', ')+'.');
  if(av.length&&!confirm(av.join('\n')+'\n\nCompilar mesmo assim?'))return;
@@ -284,7 +288,7 @@ async function acompanhar(nome,commit,placa,t0,addr){
   LS('pend',null);$('#prog').hidden=true;$('#logBox').open=true;
   throw new Error('A compilação falhou'+(et?' na etapa "'+et+'"':'')+'.'+(er?'\n'+er:'')+'\nVeja o log completo abaixo.')}
  const size=fi.size;prog(100,3);LS('pend',null);
- lastBin=nome;$('#rname').textContent=nome+'.ino.bin';$('#rmeta').textContent=mb(size)+', compilado em '+quando(Date.now())+' para '+bname(placa);$('#res').hidden=false;{const ra=$('#raddr');ra.hidden=!addr;if(addr){ra.href='http://'+addr;ra.textContent='Tela da placa: http://'+addr}}
+ lastBin=nome;$('#rname').textContent=nome+'.ino.bin';$('#rmeta').textContent=mb(size)+', compilado em '+quando(Date.now())+' para '+bname(placa);$('#res').hidden=false;{const ra=$('#raddr');ra.hidden=!addr;if(addr){ra.href='http://'+addr+'.local';ra.textContent='Tela da placa: http://'+addr+'.local'}}
  if(cfg.ask)msg('Pronto! Toque em "Salvar em..." para escolher onde guardar.');else{msg('Pronto! Baixando...');await baixar(nome);msg('Pronto!')}
  dados.recentes=[{nome,t:Date.now(),placa,size},...dados.recentes.filter(x=>x.nome!==nome)].slice(0,10);
  await gravar();desenhar();
@@ -307,7 +311,7 @@ async function carregar(){
  if(!cfg.repo||!cfg.token)return desenhar();
  try{const r=await api('/contents/dados.json');if(r.ok){const j=await r.json();dados={salvos:[],recentes:[],placas:[],...JSON.parse(unb64(j.content))}}}catch(e){}
  try{const r=await api('/contents/bibliotecas.txt',{headers:RAW});libsRepo=r.ok?(await r.text()).split(/\r?\n/).map(l=>l.trim()).filter(l=>l&&l[0]!=='#').map(l=>l.replace(/@.*$/,'').toLowerCase()):r.status===404?[]:null}catch(e){}
- let novo=false;(dados.placas||[]).forEach(p=>{if(!p.id){p.id=uid();novo=true}});if(novo)gravar();
+ let novo=false;(dados.placas||[]).forEach(p=>{if(!p.id){p.id=uid();novo=true}if(!p.host&&/\.local$/i.test(p.ip||'')){p.host=p.ip.replace(/\.local$/i,'').toLowerCase();p.ip='';novo=true}});if(novo)gravar();
  if(sel&&!selecionada()){sel=null;LS('sel',null)}
  desenhar();if(cur)render();
 }
@@ -346,23 +350,24 @@ async function addLib(nome){
  libsRepo=[...(libsRepo||[]),nome.toLowerCase()];render();msg('Biblioteca "'+nome+'" adicionada ao bibliotecas.txt.');
 }
 let editIdx=-1;
-function abrirDlg(i){editIdx=i;const p=dados.placas[i]||{};$('#dTit').textContent=i>=0?'Editar placa':'Nova placa';$('#pNome').value=p.nome||'';$('#pIp').value=p.ip||'';$('#pTipo').value=p.tipo||$('#placa').value;$('#pDev').value=p.dev||'';$('#dlg').showModal()}
+function abrirDlg(i){editIdx=i;const p=dados.placas[i]||{};$('#dTit').textContent=i>=0?'Editar placa':'Nova placa';$('#pNome').value=p.nome||'';$('#pHost').value=p.host||'';$('#pIp').value=p.ip||'';$('#pTipo').value=p.tipo||$('#placa').value;$('#pDev').value=p.dev||'';$('#dlg').showModal()}
 function pintarPlacas(){
- $('#brd').innerHTML=(dados.placas||[]).map((p,i)=>{const on=p.id===sel;return `<div class="sv${on?' sel':''}" data-id="${esc(p.id)}"><b>${esc(p.nome)}</b><small>${esc(bname(p.tipo))}${p.dev?' | ID '+esc(p.dev):''}<br>http://${esc(ipDe(p))}</small>
- <div class="row"><a href="http://${esc(ipDe(p))}" target="_blank" rel="noopener">Abrir OTA</a><button data-u="${esc(p.id)}">${on?'Selecionada':'Usar'}</button></div>
+ $('#brd').innerHTML=(dados.placas||[]).map((p,i)=>{const on=p.id===sel;return `<div class="sv${on?' sel':''}" data-id="${esc(p.id)}"><b>${esc(p.nome)}</b><small>${esc(bname(p.tipo))}${p.dev?' | ID '+esc(p.dev):''}<br>${esc(linkDe(p))}${p.host&&p.ip?'<br>IP: '+esc(ipDe(p)):''}</small>
+ <div class="row"><a href="${esc(linkDe(p))}" target="_blank" rel="noopener">Abrir OTA</a><button data-u="${esc(p.id)}">${on?'Selecionada':'Usar'}</button></div>
  <div class="row"><button class="x" data-e="${i}">Editar</button><button class="x" data-x="${i}">Remover</button></div></div>`}).join('')
  +'<button class="sv add" id="addP" type="button"><b>+</b><span>Adicionar placa</span></button>';
  $('#addP').onclick=()=>abrirDlg(-1);
 }
 const selecionada=()=>dados.placas.find(p=>p.id===sel);
 const uid=()=>Math.random().toString(36).slice(2,9);
-const ipDe=p=>String(p.ip).replace(/^https?:\/\//,'').replace(/\/$/,'');
+const linkDe=p=>p.host?'http://'+p.host+'.local':'http://'+ipDe(p);
+const ipDe=p=>String(p.ip||'').replace(/^https?:\/\//,'').replace(/\/$/,'');
 function aplicarPlaca(p){
  $('#placa').value=p.tipo;LS('placa',p.tipo);const mud=[],av=[];
  if(cur){let c=getCode();
   if(p.dev){if(DEV.test(c)){c=c.replace(DEV,(m,a)=>a+p.dev);mud.push('DEVICE_ID '+p.dev)}else av.push('o código não tem DEVICE_ID')}
-  if(ADDR.test(c)){if(ipOk(ipDe(p))){c=c.replace(ADDR,(m,a,b,d)=>a+ipDe(p)+d);mud.push('endereço http://'+ipDe(p))}else av.push('"'+ipDe(p)+'" não é um IP, então a tela não foi fixada')}
-  else av.push('o código não tem DEVICE_IP (crie um Novo projeto ou adicione #define DEVICE_IP "")');
+  if(ADDR.test(c)){if(p.host&&nomeOk(p.host)){c=c.replace(ADDR,(m,a,b,d)=>a+p.host+d);mud.push('link http://'+p.host+'.local')}else av.push('o cartão não tem um nome na rede válido (toque em Editar)')}
+  else av.push('o código não tem DEVICE_NAME (crie um Novo projeto ou adicione #define DEVICE_NAME "nome")');
   if(c!==getCode())setCode(c);render()}
  msg('Placa "'+p.nome+'" selecionada'+(mud.length?': '+mud.join(', '):'')+'.'+(av.length?' Aviso: '+av.join('; ')+'.':''));
 }
@@ -370,16 +375,19 @@ function alternarSel(id){
  if(sel===id){sel=null;LS('sel',null);pintarPlacas();return msg('Nenhuma placa selecionada.')}
  sel=id;LS('sel',id);pintarPlacas();aplicarPlaca(selecionada());
 }
-$('#addr').onclick=()=>{const m=getCode().match(ADDR);$('#aIp').value=m?m[2]:'';$('#aErr').textContent='';$('#dAddr').showModal()};
+$('#addr').onclick=()=>{const m=getCode().match(ADDR);$('#aIp').value=m?m[2]:'';$('#aErr').textContent='';$('#aPrev').textContent='http://'+($('#aIp').value||'nome')+'.local';$('#dAddr').showModal()};
+$('#aIp').oninput=()=>{$('#aPrev').textContent='http://'+($('#aIp').value.trim().toLowerCase()||'nome')+'.local'};
 $('#aCan').onclick=()=>$('#dAddr').close();
-$('#aSave').onclick=()=>{const v=$('#aIp').value.trim().replace(/^https?:\/\//,'').replace(/\/$/,'');
- if(v&&!ipOk(v))return $('#aErr').textContent='Use um IP no formato 192.168.0.105';
+$('#aSave').onclick=()=>{const v=$('#aIp').value.trim().toLowerCase();
+ if(!nomeOk(v))return $('#aErr').textContent='Use letras, números e hífen, sem espaços. Ex.: servebot-1';
  setCode(getCode().replace(ADDR,(m,a,b,c)=>a+v+c));render();$('#dAddr').close();
- msg('Endereço do código alterado para '+(v?'http://'+v:'automático (DHCP)')+'.');
+ msg('O código agora aponta para http://'+v+'.local');
  const p=selecionada();
- if(p&&v&&ipDe(p)!==v&&confirm('Alterar também o endereço da placa "'+p.nome+'" selecionada para '+v+'?')){p.ip=v;desenhar();gravar()}};
+ if(p&&p.host!==v&&confirm('Alterar também o nome na rede da placa "'+p.nome+'" selecionada para '+v+'?')){p.host=v;desenhar();gravar()}};
 $('#pCan').onclick=()=>$('#dlg').close();
-$('#pSave').onclick=()=>{const old=dados.placas[editIdx]||{},p={id:old.id||uid(),nome:$('#pNome').value.trim()||'Placa',ip:$('#pIp').value.trim().replace(/^https?:\/\//,'').replace(/\/$/,''),tipo:$('#pTipo').value,dev:$('#pDev').value.replace(/\D/g,'')};if(!p.ip)return $('#pIp').focus();
+$('#pSave').onclick=()=>{const old=dados.placas[editIdx]||{},host=$('#pHost').value.trim().toLowerCase().replace(/\.local$/,''),ip=$('#pIp').value.trim().replace(/^https?:\/\//,'').replace(/\/$/,'');
+ if((host&&!nomeOk(host))||(!host&&!ip))return $('#pHost').focus();
+ const p={id:old.id||uid(),nome:$('#pNome').value.trim()||host||'Placa',host,ip,tipo:$('#pTipo').value,dev:$('#pDev').value.replace(/\D/g,'')};
  if(editIdx>=0)dados.placas[editIdx]=p;else dados.placas.push(p);$('#dlg').close();if(p.id===sel)aplicarPlaca(p);desenhar();gravar()};
 const editarPlaca=i=>abrirDlg(i);
 function removerPlaca(i){if(confirm('Remover "'+dados.placas[i].nome+'"?')){if(dados.placas[i].id===sel){sel=null;LS('sel',null)}dados.placas.splice(i,1);desenhar();gravar()}}
@@ -391,7 +399,7 @@ const modelo=()=>String.raw`#include <WiFi.h>
 // ================= CONFIGURAÇÃO =================
 #define DEVICE_ID   1          // número da placa (1, 2, 3...)
 #define FW_VERSION  "v1"       // versão do firmware
-#define DEVICE_IP   ""         // IP fixo da tela, ex.: "192.168.0.105" (vazio = automático)
+#define DEVICE_NAME "esp32-1"  // nome na rede: a tela abre em http://<nome>.local
 const char* WIFI_SSID = "${cfg.ssid||'SUA_REDE'}";
 const char* WIFI_PASS = "${cfg.wpass||'SUA_SENHA'}";
 const char* OTA_USER  = "admin";
@@ -400,8 +408,6 @@ const char* OTA_PASS  = "ota1234";
 
 WebServer server(80);
 String hostName;
-IPAddress ipFixo, gateway;
-bool usandoIpFixo = false;
 
 const char PAGE[] PROGMEM = R"rawliteral(
 <!DOCTYPE html><html lang="pt-br"><head><meta charset="utf-8">
@@ -430,8 +436,8 @@ button.alt{background:transparent;border:1px solid var(--line);color:var(--ink)}
 <h1>%NAME%</h1><p class="sub">Atualização de firmware</p>
 %WARN%
 <div class="card grid">
-<div class="full"><small>Endereço desta tela (%MODO%)</small><b>%ADDR%</b></div>
-<div><small>Nome na rede</small><b>%HOST%.local</b></div>
+<div class="full"><small>Endereço desta tela</small><b>%ADDR%</b></div>
+<div><small>IP atual (reserva)</small><b>%IP%</b></div>
 <div><small>Versão</small><b>%VER%</b></div>
 <div><small>Chip</small><b>%CHIP%</b></div>
 <div><small>Sinal Wi-Fi</small><b>%RSSI% dBm</b></div>
@@ -476,9 +482,8 @@ void handleRoot() {
   String aviso = (String(OTA_PASS) == "ota1234") ? "<div class=\"warn\">Troque a senha padrão do OTA (OTA_PASS) antes de usar em rede aberta.</div>" : "";
   p.replace("%WARN%", aviso);
   p.replace("%NAME%", hostName);
-  p.replace("%ADDR%", "http://" + WiFi.localIP().toString());
-  p.replace("%MODO%", usandoIpFixo ? "IP fixo" : "automático");
-  p.replace("%HOST%", hostName);
+  p.replace("%ADDR%", "http://" + hostName + ".local");
+  p.replace("%IP%", WiFi.localIP().toString());
   p.replace("%VER%", FW_VERSION);
   p.replace("%CHIP%", ESP.getChipModel());
   p.replace("%RSSI%", String(WiFi.RSSI()));
@@ -516,13 +521,11 @@ void handleReboot() {
   ESP.restart();
 }
 
-bool conectar(bool fixo) {
+bool conectar() {
   WiFi.disconnect(true);
   delay(200);
   WiFi.mode(WIFI_STA);
   WiFi.setHostname(hostName.c_str());
-  if (fixo) WiFi.config(ipFixo, gateway, IPAddress(255, 255, 255, 0), gateway);
-  else WiFi.config(IPAddress(), IPAddress(), IPAddress());
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   unsigned long t0 = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - t0 < 15000) {
@@ -535,29 +538,23 @@ bool conectar(bool fixo) {
 void setup() {
   Serial.begin(115200);
   delay(500);
-  hostName = "esp32-" + String(DEVICE_ID);
+  hostName = DEVICE_NAME;
+  hostName.toLowerCase();
 
-  if (strlen(DEVICE_IP) > 0 && ipFixo.fromString(DEVICE_IP)) {
-    gateway = ipFixo;
-    gateway[3] = 1;
-    usandoIpFixo = true;
-  }
-
-  Serial.printf("\nConectando em %s", WIFI_SSID);
-  bool ok = conectar(usandoIpFixo);
-  if (!ok && usandoIpFixo) {
-    Serial.println("\nIP fixo não funcionou, tentando automático...");
-    usandoIpFixo = false;
-    ok = conectar(false);
-  }
-  if (!ok) {
+  Serial.printf("\nPlaca %d conectando em %s", DEVICE_ID, WIFI_SSID);
+  if (!conectar()) {
     Serial.println("\nSem Wi-Fi. Reiniciando...");
     delay(1000);
     ESP.restart();
   }
 
-  Serial.printf("\nTela da placa: http://%s (%s)\n", WiFi.localIP().toString().c_str(), usandoIpFixo ? "IP fixo" : "automático");
-  if (MDNS.begin(hostName.c_str())) MDNS.addService("http", "tcp", 80);
+  if (MDNS.begin(hostName.c_str())) {
+    MDNS.addService("http", "tcp", 80);
+    Serial.printf("\nTela da placa: http://%s.local\n", hostName.c_str());
+  } else {
+    Serial.println("\nmDNS falhou, use o IP abaixo.");
+  }
+  Serial.printf("IP atual (reserva): http://%s\n", WiFi.localIP().toString().c_str());
 
   server.on("/", HTTP_GET, handleRoot);
   server.on("/update", HTTP_POST, handleUpdateDone, handleUpload);
